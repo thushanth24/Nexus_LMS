@@ -1,0 +1,45 @@
+{
+  "name": "nexus-lms",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.893.0",
+    "@aws-sdk/s3-request-presigner": "^3.893.0",
+    "@nestjs/common": "^11.1.6",
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/core": "^11.1.6",
+    "@nestjs/jwt": "^11.0.0",
+    "@nestjs/passport": "^11.0.5",
+    "@prisma/client": "^6.16.2",
+    "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-navigation/bottom-tabs": "^7.4.7",
+    "@react-navigation/native": "^7.1.17",
+    "@react-navigation/stack": "^7.4.8",
+    "bcrypt": "^6.0.0",
+    "class-validator": "^0.14.2",
+    "crypto": "^1.0.1",
+    "expo-linear-gradient": "^15.0.7",
+    "livekit-server-sdk": "^2.13.3",
+    "passport-jwt": "^4.0.1",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-native": "^0.81.4",
+    "react-native-safe-area-context": "^5.6.1",
+    "react-native-vector-icons": "^10.3.0",
+    "react-router-dom": "^7.9.1",
+    "recharts": "^3.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "prisma": "^6.16.2",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}

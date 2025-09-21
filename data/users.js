@@ -1,0 +1,7 @@
+export default [
+  {"id":"u_admin","role":"ADMIN","name":"Institute Admin","email":"admin@inst.com","timezone":"Asia/Colombo", "avatarUrl": "https://picsum.photos/seed/admin/100/100"},
+  {"id":"t_1","role":"TEACHER","name":"Ms. Karina","email":"teacher@inst.com","subjects":["English","IELTS"], "timezone":"Europe/London", "avatarUrl": "https://picsum.photos/seed/karina/100/100"},
+  {"id":"t_2","role":"TEACHER","name":"Mr. Deen","email":"deen@inst.com","subjects":["Chess"], "timezone":"America/New_York", "avatarUrl": "https://picsum.photos/seed/deen/100/100"},
+  {"id":"s_10","role":"STUDENT","name":"Tharun","email":"student@inst.com","level":"B1","timezone":"Asia/Kolkata", "avatarUrl": "https://picsum.photos/seed/tharun/100/100"},
+  {"id":"s_11","role":"STUDENT","name":"Mina","email":"mina@mail.com","level":"A2","timezone":"Europe/London", "avatarUrl": "https://picsum.photos/seed/mina/100/100"}
+];

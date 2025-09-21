@@ -1,0 +1,5 @@
+{
+  "name": "Nexus LMS",
+  "description": "A comprehensive Learning Management System for online institutes, featuring role-based dashboards for admins, teachers, and students, live session integration with an interactive chessboard, and detailed progress tracking.",
+  "requestFramePermissions": []
+}
