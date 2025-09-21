@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Card from '../../components/ui/Card';
-import { useAuth } from '../../hooks/useAuth';
+import { ClockIcon } from '../../components/ui/Icons';
 import * as api from '../../services/api';
 import { Session, Homework } from '../../types';
-import { ClockIcon } from '../../components/ui/Icons';
+import { useAuth } from '../../hooks/useAuth';
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, LineChart, Line, XAxis, YAxis, Tooltip } from 'recharts';
 
 const StudentDashboard: React.FC = () => {

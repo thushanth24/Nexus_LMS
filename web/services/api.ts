@@ -1,11 +1,19 @@
 // Mocks for the API service layer
-import usersData from '../apps/web/src/data/users.js';
-import classesData from '../apps/web/src/data/classes.js';
-import scheduleData from '../apps/web/src/data/schedule.js';
-import homeworkData from '../apps/web/src/data/homework.js';
-import submissionsData from '../apps/web/src/data/submissions.js';
-import chessPresetsData from '../apps/web/src/data/chess-presets.js';
-import { User, UserRole, Session, Group, Homework, Submission, ChessPreset } from '../apps/web/src/types';
+import { User, UserRole, Session, Group, Homework, Submission, ChessPreset } from '../types';
+import usersData from '../data/users.js';
+import classesDataRaw from '../data/classes.js';
+import scheduleData from '../data/schedule.js';
+import homeworkData from '../data/homework.js';
+import submissionsData from '../data/submissions.js';
+import chessPresetsData from '../data/chess-presets.js';
+
+// Type the classes data structure
+interface ClassesData {
+    groups: Group[];
+    oneToOnes: Array<Group & { studentId: string }>;
+}
+
+const classesData = classesDataRaw as unknown as ClassesData;
 
 // Helper to simulate network delay
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -43,72 +51,80 @@ export const getTeachers = async (): Promise<User[]> => {
     await sleep(200);
     return (usersData as User[]).filter(u => u.role === UserRole.TEACHER);
 };
+
 export const getStudents = async (): Promise<User[]> => {
     await sleep(200);
     return (usersData as User[]).filter(u => u.role === UserRole.STUDENT);
 };
 
-// --- GROUPS ---
+// --- CLASSES ---
 export const getGroups = async (): Promise<Group[]> => {
     await sleep(200);
-    return classesData.groups as Group[];
+    // Combine both groups and one-to-one sessions into a single array
+    return [...classesData.groups, ...classesData.oneToOnes];
 };
+
 export const getGroupById = async (id: string): Promise<Group | undefined> => {
     await sleep(200);
-    return (classesData.groups as Group[]).find(g => g.id === id);
+    const allGroups = [...classesData.groups, ...classesData.oneToOnes];
+    return allGroups.find(c => c.id === id) as Group | undefined;
 };
 
 // --- SCHEDULE ---
 export const getMySessions = async (): Promise<Session[]> => {
-    await sleep(400);
-    const userId = localStorage.getItem('mock-user-id');
-    if (!userId) return [];
-
-    const user = (usersData as User[]).find(u => u.id === userId);
-    if (!user) return [];
-
-    const allSessions = scheduleData as Session[];
-
-    if (user.role === UserRole.ADMIN) {
-        return allSessions;
+    await sleep(300);
+    const me = await getMe();
+    
+    if (me.role === UserRole.TEACHER) {
+        return (scheduleData as Session[]).filter(s => s.teacherId === me.id);
+    } else if (me.role === UserRole.STUDENT) {
+        return (scheduleData as Session[]).filter(s => s.attendees.includes(me.id));
     }
-    if (user.role === UserRole.TEACHER) {
-        return allSessions.filter(s => s.teacherId === userId);
-    }
-    if (user.role === UserRole.STUDENT) {
-        return allSessions.filter(s => s.attendees.includes(userId));
-    }
+    
     return [];
 };
 
 // --- HOMEWORK & SUBMISSIONS ---
 export const getHomeworkForClass = async (classId: string): Promise<Homework[]> => {
-    await sleep(200);
-    return (homeworkData as Homework[]).filter(hw => hw.classId === classId);
+    await sleep(300);
+    return (homeworkData as Homework[]).filter(h => h.classId === classId);
 };
+
 export const getMyHomework = async (): Promise<(Homework & { submissions: Submission[] })[]> => {
     await sleep(300);
-    const userId = localStorage.getItem('mock-user-id');
-    if (!userId) return [];
+    const me = await getMe();
     
-    // This is a simplified logic. A real API would know the student's classes.
-    // We'll just return all homework and associate it with the student's submissions.
-    return (homeworkData as Homework[]).map(hw => {
-        const submission = (submissionsData as Submission[]).find(s => s.studentId === userId && s.homeworkId === hw.id);
-        return { ...hw, submissions: submission ? [submission] : [] };
-    });
+    if (me.role === UserRole.TEACHER) {
+        // For teachers, return all homework for their classes
+        const allGroups = [...classesData.groups, ...classesData.oneToOnes];
+        const myHomework = (homeworkData as Homework[]).filter(h => {
+            const classData = allGroups.find(c => c.id === h.classId);
+            return classData?.teacherId === me.id;
+        });
+        
+        return myHomework.map(hw => ({
+            ...hw,
+            submissions: (submissionsData as Submission[]).filter(s => s.homeworkId === hw.id)
+        }));
+    } else {
+        // For students, return their submitted homework
+        const mySubmissions = (submissionsData as Submission[]).filter(s => s.studentId === me.id);
+        return mySubmissions.map(sub => ({
+            ...(homeworkData as Homework[]).find(h => h.id === sub.homeworkId)!,
+            submissions: [sub]
+        }));
+    }
 };
 
 export const submitHomework = async (data: { homeworkId: string; content: { text?: string } }): Promise<{ success: boolean }> => {
-    await sleep(500);
-    console.log("Mock submitting homework:", data);
-    // This is a mock, so we won't persist the change.
+    await sleep(300);
+    // In a real app, this would make an API call
     return { success: true };
 };
+
 export const gradeSubmission = async (submissionId: string, data: { grade: number; feedback: string }): Promise<{ success: boolean }> => {
-    await sleep(500);
-    console.log(`Mock grading submission ${submissionId}:`, data);
-    // This is a mock, so we won't persist the change.
+    await sleep(300);
+    // In a real app, this would make an API call
     return { success: true };
 };
 
