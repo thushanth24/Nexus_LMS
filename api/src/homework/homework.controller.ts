@@ -1,9 +1,9 @@
 import { Controller, Get, Param, UseGuards, Request } from '@nestjs/common';
-import { HomeworkService } from './homework.service';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
-import { UserRole } from '@prisma/client';
+import { HomeworkService } from './homework.service.js';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard.js';
+import { RolesGuard } from '../common/guards/roles.guard.js';
+import { Roles } from '../common/decorators/roles.decorator.js';
+import { UserRole } from '../prisma-enums.js';
 
 @Controller('homework')
 @UseGuards(JwtAuthGuard, RolesGuard)

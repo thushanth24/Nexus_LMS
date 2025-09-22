@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service.js';
 
 @Injectable()
 export class HomeworkService {
@@ -18,7 +18,7 @@ export class HomeworkService {
     return this.prisma.homework.findMany({
         where: {
             OR: [
-                { group: { roster: { some: { id: studentId } } } },
+                { group: { members: { some: { id: studentId } } } },
                 { pair: { studentId: studentId } },
             ]
         },
@@ -30,3 +30,4 @@ export class HomeworkService {
     })
   }
 }
+

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service.js';
 
 @Injectable()
 export class GroupsService {
@@ -9,7 +9,7 @@ export class GroupsService {
         return this.prisma.group.findMany({
             include: {
                 teacher: { select: { name: true } },
-                roster: { select: { id: true }}
+                members: { select: { id: true }}
             }
         });
     }
@@ -19,9 +19,10 @@ export class GroupsService {
             where: { id },
             include: {
                 teacher: true,
-                roster: true,
+                members: true,
                 sessions: true,
             }
         });
     }
 }
+

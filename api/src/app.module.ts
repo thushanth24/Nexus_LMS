@@ -1,17 +1,17 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { AuthModule } from './auth/auth.module';
-import { UsersModule } from './users/users.module';
-import { PrismaModule } from './prisma/prisma.module';
-import { GroupsModule } from './groups/groups.module';
-import { ScheduleModule } from './schedule/schedule.module';
-import { LivekitModule } from './livekit/livekit.module';
-import { MaterialsModule } from './materials/materials.module';
-import { HomeworkModule } from './homework/homework.module';
-import { SubmissionsModule } from './submissions/submissions.module';
-import { ChessModule } from './chess/chess.module';
-import { HealthModule } from './health/health.module';
-import configuration from './config/configuration';
+import { AuthModule } from './auth/auth.module.js';
+import { UsersModule } from './users/users.module.js';
+import { PrismaModule } from './prisma/prisma.module.js';
+import { GroupsModule } from './groups/groups.module.js';
+import { ScheduleModule } from './schedule/schedule.module.js';
+import { LivekitModule } from './livekit/livekit.module.js';
+import { MaterialsModule } from './materials/materials.module.js';
+import { HomeworkModule } from './homework/homework.module.js';
+import { SubmissionsModule } from './submissions/submissions.module.js';
+import { ChessModule } from './chess/chess.module.js';
+import { HealthModule } from './health/health.module.js';
+import configuration from './config/configuration.js';
 
 @Module({
   imports: [

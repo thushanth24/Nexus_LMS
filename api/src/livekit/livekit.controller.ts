@@ -1,7 +1,7 @@
 import { Controller, Post, Body, UseGuards, Request } from '@nestjs/common';
-import { LivekitService } from './livekit.service';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { CreateTokenDto } from './dto/create-token.dto';
+import { LivekitService } from './livekit.service.js';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard.js';
+import { CreateTokenDto } from './dto/create-token.dto.js';
 
 @Controller('livekit')
 @UseGuards(JwtAuthGuard)

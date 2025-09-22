@@ -1,8 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { CreateSubmissionDto } from './dto/create-submission.dto';
-import { GradeSubmissionDto } from './dto/grade-submission.dto';
-import { SubmissionStatus } from '@prisma/client';
+import { PrismaService } from '../prisma/index.js';
+import { CreateSubmissionDto, GradeSubmissionDto } from './dto/index.js';
+import { SubmissionStatus } from '../prisma-enums/index.js';
 
 @Injectable()
 export class SubmissionsService {
@@ -21,14 +20,22 @@ export class SubmissionsService {
       return this.prisma.submission.update({
         where: { id: existingSubmission.id },
         data: {
-          content: createSubmissionDto.content,
+          content: JSON.stringify(createSubmissionDto.content), // Convert content to string
           submittedAt: new Date(),
           status: SubmissionStatus.SUBMITTED,
         },
       });
     } else {
-        // This case should ideally not happen if submissions are pre-created
-        throw new NotFoundException('Submission record not found for this homework.');
+      // If no submission exists, create a new one
+      return this.prisma.submission.create({
+        data: {
+          homework: { connect: { id: createSubmissionDto.homeworkId } },
+          student: { connect: { id: studentId } },
+          content: JSON.stringify(createSubmissionDto.content), // Convert content to string
+          submittedAt: new Date(),
+          status: SubmissionStatus.SUBMITTED,
+        },
+      });
     }
   }
 
@@ -37,7 +44,7 @@ export class SubmissionsService {
       where: { id: submissionId },
       data: {
         grade: gradeSubmissionDto.grade,
-        feedback: gradeSubmissionDto.feedback,
+        feedback: gradeSubmissionDto.feedback || null,
         status: SubmissionStatus.GRADED,
       },
     });

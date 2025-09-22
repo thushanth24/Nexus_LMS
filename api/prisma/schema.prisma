@@ -8,87 +8,191 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  // Note: Make sure the .env file is in the root directory
+}
+
+enum UserRole {
+  ADMIN
+  TEACHER
+  STUDENT
+}
+
+enum MaterialType {
+  PDF
+  VIDEO
+}
+
+enum HomeworkType {
+  TEXT
+  PGN
+}
+
+enum SubmissionStatus {
+  PENDING
+  SUBMITTED
+  GRADED
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String?
+  id        String    @id @default(uuid())
+  email     String    @unique
   password  String
-  role      Role     @default(STUDENT)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  name      String
+  role      UserRole
+  timezone  String?
+  subjects  String[]
+  level     String?
+  avatarUrl String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   // Relations
-  enrollments Enrollment[]
-  submissions Submission[]
-  courses     Course[]     @relation("CourseInstructor")
-  assignedAssignments Assignment[] @relation("AssignmentInstructor")
+  taughtGroups  Group[]     @relation("GroupTeacher")
+  taughtPairs   Pair[]      @relation("PairTeacher")
+  studentPairs  Pair[]      @relation("PairStudent")
+  groups        Group[]     @relation("GroupMembers")
+  submissions   Submission[]
+  chessPresets  ChessPreset[]
+  sessions      Session[]   @relation("SessionAttendees")
+  groupMemberLinks GroupMemberLink[]
+  sessionAttendeeLinks SessionAttendeeLink[]
 }
 
-model Course {
-  id          String       @id @default(uuid())
+model Group {
+  id           String    @id @default(uuid())
+  title        String
+  subject      String
+  teacher      User      @relation("GroupTeacher", fields: [teacherId], references: [id])
+  teacherId    String
+  meetingDays  String[]
+  durationMin  Int
+  cap          Int
+  levelSpread  String[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  members     User[]    @relation("GroupMembers")
+  sessions    Session[]
+  materials   Material[]
+  homeworks   Homework[]
+  groupMemberLinks GroupMemberLink[]
+}
+
+model Pair {
+  id          String    @id @default(uuid())
   title       String
-  description String?
-  instructor  User         @relation("CourseInstructor", fields: [instructorId], references: [id])
-  instructorId String
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  subject     String
+  teacher     User      @relation("PairTeacher", fields: [teacherId], references: [id])
+  teacherId   String
+  student     User      @relation("PairStudent", fields: [studentId], references: [id])
+  studentId   String
+  durationMin Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   // Relations
-  enrollments Enrollment[]
-  assignments Assignment[]
+  sessions    Session[]
+  materials   Material[]
+  homeworks   Homework[]
 }
 
-model Enrollment {
-  id        String   @id @default(uuid())
-  userId    String
-  courseId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model Session {
+  id            String    @id @default(uuid())
+  title         String
+  group         Group?    @relation(fields: [groupId], references: [id])
+  groupId       String?
+  pair          Pair?     @relation(fields: [pairId], references: [id])
+  pairId        String?
+  startsAt      DateTime
+  endsAt        DateTime
+  isChessEnabled Boolean   @default(false)
+  attendees     User[]     @relation("SessionAttendees")
+  sessionAttendeeLinks SessionAttendeeLink[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  // Relations
-  user   User   @relation(fields: [userId], references: [id])
-  course Course @relation(fields: [courseId], references: [id])
-
-  @@unique([userId, courseId])
+  @@unique([groupId, pairId])
 }
 
-model Assignment {
-  id          String   @id @default(uuid())
-  title       String
-  description String?
-  dueDate     DateTime
-  courseId    String
-  instructorId String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+model Material {
+  id        String       @id @default(uuid())
+  title     String
+  type      MaterialType
+  url       String
+  group     Group?       @relation(fields: [groupId], references: [id])
+  groupId   String?
+  pair      Pair?        @relation(fields: [pairId], references: [id])
+  pairId    String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 
-  // Relations
-  course      Course      @relation(fields: [courseId], references: [id])
-  instructor  User        @relation("AssignmentInstructor", fields: [instructorId], references: [id])
-  submissions Submission[]
+  @@unique([groupId, pairId])
+}
+
+model Homework {
+  id           String       @id @default(uuid())
+  title        String
+  instructions String
+  type         HomeworkType
+  dueAt        DateTime
+  group        Group?       @relation(fields: [groupId], references: [id])
+  groupId      String?
+  pair         Pair?        @relation(fields: [pairId], references: [id])
+  pairId       String?
+  submissions  Submission[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@unique([groupId, pairId])
 }
 
 model Submission {
-  id           String   @id @default(uuid())
-  content      String
-  grade        Int?
-  assignmentId String
-  studentId    String
-  submittedAt  DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String           @id @default(uuid())
+  homework    Homework         @relation(fields: [homeworkId], references: [id])
+  homeworkId  String
+  student     User             @relation(fields: [studentId], references: [id])
+  studentId   String
+  submittedAt DateTime?
+  content     Json?
+  status      SubmissionStatus @default(PENDING)
+  grade       Int?
+  feedback    String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
-  // Relations
-  assignment Assignment @relation(fields: [assignmentId], references: [id])
-  student    User       @relation(fields: [studentId], references: [id])
-  
-  @@unique([assignmentId, studentId])
+  @@unique([homeworkId, studentId])
 }
 
-enum Role {
-  STUDENT
-  INSTRUCTOR
-  ADMIN
+model ChessPreset {
+  id        String   @id @default(uuid())
+  label     String
+  fen       String?
+  pgn       String?
+  owner     User     @relation(fields: [ownerId], references: [id])
+  ownerId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
+
+// Join tables for many-to-many relationships
+model GroupMemberLink {
+  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId  String
+
+  @@id([groupId, userId])
+  @@map("_GroupMembers")
+}
+
+model SessionAttendeeLink {
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+
+  @@id([sessionId, userId])
+  @@map("_SessionAttendees")
+}
+
+

@@ -1,6 +1,6 @@
 import { Controller, Get, UseGuards, Request } from '@nestjs/common';
-import { ScheduleService } from './schedule.service';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { ScheduleService } from './schedule.service.js';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard.js';
 
 @Controller('schedule')
 @UseGuards(JwtAuthGuard)

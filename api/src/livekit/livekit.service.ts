@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AccessToken, RoomServiceClient, Room } from 'livekit-server-sdk';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '../prisma-enums.js';
 
 @Injectable()
 export class LivekitService {
