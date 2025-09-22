@@ -16,7 +16,8 @@
     "test:cov": "jest --coverage",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "create:admin": "node prisma/create-admin.cjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.540.0",
@@ -31,6 +32,7 @@
     "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "commander": "^14.0.1",
     "livekit-server-sdk": "^2.13.3",
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.1",
@@ -47,6 +49,7 @@
     "jest": "^29.7.0",
     "prisma": "^5.10.0",
     "supertest": "^6.3.3",
+    "ts-command-line-args": "^2.5.0",
     "ts-jest": "^29.1.1",
     "ts-loader": "^9.5.1",
     "ts-node": "^10.9.2",

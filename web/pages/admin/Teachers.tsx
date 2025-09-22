@@ -5,13 +5,15 @@ import Card from '../../components/ui/Card';
 import Modal from '../../components/ui/Modal';
 import * as api from '../../services/api';
 import classes from '../../data/classes.js';
-import { User, UserRole } from '../../types';
+import { User } from '../../types';
 
 const AdminTeachers: React.FC = () => {
     const [teachers, setTeachers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [formError, setFormError] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     
     // Form state
     const [name, setName] = useState('');
@@ -42,26 +44,39 @@ const AdminTeachers: React.FC = () => {
         return { groups, oneToOnes, rating };
     };
 
-    const handleFormSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        const newTeacher: User = {
-            id: `t_${new Date().getTime()}`,
-            name,
-            email,
-            role: UserRole.TEACHER,
-            subjects: subjects.split(',').map(s => s.trim()).filter(Boolean),
-            timezone: 'America/New_York', // Default timezone
-            avatarUrl: `https://picsum.photos/seed/${name.split(' ')[0]}/100/100`,
-        };
-        // NOTE: This adds the teacher to the local state only. No API endpoint exists for creation.
-        setTeachers(prev => [...prev, newTeacher]);
-        
-        // Close modal and reset form
-        setIsModalOpen(false);
+    const resetForm = () => {
         setName('');
         setEmail('');
         setSubjects('');
         setPassword('');
+        setFormError(null);
+    };
+
+    const handleFormSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const formattedSubjects = subjects.split(',').map(s => s.trim()).filter(Boolean);
+
+        try {
+            setIsSubmitting(true);
+            setFormError(null);
+
+            const invitedTeacher = await api.inviteTeacher({
+                name,
+                email,
+                password,
+                subjects: formattedSubjects,
+                timezone: 'America/New_York',
+            });
+
+            setTeachers(prev => [...prev, invitedTeacher]);
+            setIsModalOpen(false);
+            resetForm();
+        } catch (err: any) {
+            const message = err?.message || 'Failed to invite teacher';
+            setFormError(message);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -70,7 +85,7 @@ const AdminTeachers: React.FC = () => {
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
                      <h2 className="text-2xl font-bold tracking-tight text-neutral">Manage Teachers</h2>
                     <button 
-                        onClick={() => setIsModalOpen(true)}
+                        onClick={() => { setIsModalOpen(true); resetForm(); }}
                         className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-primary to-blue-400 text-white font-semibold rounded-lg hover:shadow-lg transform hover:-translate-y-1 transition-all duration-200"
                     >
                         + Invite Teacher
@@ -106,7 +121,7 @@ const AdminTeachers: React.FC = () => {
                                             <td className="p-4">{teacher.subjects?.join(', ')}</td>
                                             <td className="p-4 text-center">{stats.groups}</td>
                                             <td className="p-4 text-center">{stats.oneToOnes}</td>
-                                            <td className="p-4 text-yellow-500 font-bold">{stats.rating} ★</td>
+                                            <td className="p-4 text-yellow-500 font-bold">{stats.rating} ?~.</td>
                                             <td className="p-4">
                                                 <button className="text-primary hover:underline font-semibold">View</button>
                                                 <button className="text-accent hover:underline ml-4 font-semibold">Edit</button>
@@ -120,7 +135,7 @@ const AdminTeachers: React.FC = () => {
                 </div>
             </Card>
 
-            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Invite New Teacher">
+            <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); resetForm(); }} title="Invite New Teacher">
                 <form onSubmit={handleFormSubmit} className="space-y-4">
                     <div>
                         <label htmlFor="name" className="block text-sm font-medium text-neutral">Full Name</label>
@@ -138,12 +153,13 @@ const AdminTeachers: React.FC = () => {
                         <label htmlFor="password" className="block text-sm font-medium text-neutral">Password</label>
                         <input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition" />
                     </div>
+                    {formError && <p className="text-error text-sm">{formError}</p>}
                     <div className="flex justify-end space-x-3 pt-4 border-t mt-6">
-                        <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-base-200 text-neutral font-semibold rounded-lg hover:bg-base-300 transition">
+                        <button type="button" onClick={() => { setIsModalOpen(false); resetForm(); }} className="px-4 py-2 bg-base-200 text-neutral font-semibold rounded-lg hover:bg-base-300 transition">
                             Cancel
                         </button>
-                        <button type="submit" className="px-5 py-2.5 bg-gradient-to-r from-primary to-blue-400 text-white font-semibold rounded-lg hover:shadow-lg transform hover:-translate-y-1 transition-all duration-200">
-                            Send Invite
+                        <button type="submit" disabled={isSubmitting} className="px-5 py-2.5 bg-gradient-to-r from-primary to-blue-400 text-white font-semibold rounded-lg hover:shadow-lg transform hover:-translate-y-1 transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed">
+                            {isSubmitting ? 'Sending...' : 'Send Invite'}
                         </button>
                     </div>
                 </form>
