@@ -1,244 +1,376 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Card from '../../components/ui/Card';
 import Modal from '../../components/ui/Modal';
-import allUsers from '../../data/users.js';
-import allClasses from '../../data/classes.js';
-import allSchedule from '../../data/schedule.js';
-import allMaterials from '../../data/materials.js';
-import allHomeworkData from '../../data/homework.js';
-import allSubmissionsData from '../../data/submissions.js';
-import { User, UserRole, Homework, Submission } from '../../types';
+import * as api from '../../services/api';
+import { Group, OneToOne, Homework, Submission, Session, User, Material } from '../../types';
+
+interface ClassDetailState {
+    type: 'GROUP' | 'ONE_TO_ONE';
+    group?: Group;
+    pair?: OneToOne;
+}
+
+interface HomeworkWithSubmissions extends Homework {
+    submissions: Submission[];
+}
 
 const TeacherClassDetail: React.FC = () => {
     const { classId } = useParams<{ classId: string }>();
-    const [activeTab, setActiveTab] = useState('Homework');
+    const [classDetail, setClassDetail] = useState<ClassDetailState | null>(null);
+    const [materials, setMaterials] = useState<Material[]>([]);
+    const [homework, setHomework] = useState<HomeworkWithSubmissions[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    const [homework, setHomework] = useState<Homework[]>(() => 
-        (allHomeworkData as Homework[]).filter(hw => hw.classId === classId)
-    );
-    const [submissions, setSubmissions] = useState<Submission[]>(() => 
-        allSubmissionsData as Submission[]
-    );
-    
-    const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
     const [isGradeModalOpen, setIsGradeModalOpen] = useState(false);
     const [currentSubmission, setCurrentSubmission] = useState<Submission | null>(null);
-
-    // Form state for new homework
-    const [hwTitle, setHwTitle] = useState('');
-    const [hwInstructions, setHwInstructions] = useState('');
-    const [hwDueDate, setHwDueDate] = useState('');
-    
-    // Form state for grading
     const [grade, setGrade] = useState('');
     const [feedback, setFeedback] = useState('');
+    const [gradeError, setGradeError] = useState<string | null>(null);
 
-    const classInfo = useMemo(() => {
-        const group = allClasses.groups.find(g => g.id === classId);
-        const oneToOne = allClasses.oneToOnes.find(o => o.id === classId);
-        return group || oneToOne;
+    useEffect(() => {
+        const fetchClassDetail = async () => {
+            if (!classId) return;
+            try {
+                setLoading(true);
+                let detail: ClassDetailState | null = null;
+                let lastError: Error | null = null;
+
+                try {
+                    const groupData = await api.getGroupById(classId);
+                    detail = { type: 'GROUP', group: groupData };
+                } catch (groupError: any) {
+                    lastError = groupError instanceof Error ? groupError : new Error(groupError?.message || 'Unable to load class');
+                    try {
+                        const pairData = await api.getPairById(classId);
+                        detail = { type: 'ONE_TO_ONE', pair: pairData };
+                        lastError = null;
+                    } catch (pairError: any) {
+                        lastError = pairError instanceof Error ? pairError : new Error(pairError?.message || 'Unable to load class');
+                    }
+                }
+
+                if (!detail) {
+                    throw lastError ?? new Error('Class not found');
+                }
+
+                const [materialsData, homeworkData] = await Promise.all([
+                    api.getMaterialsForClass(classId),
+                    api.getHomeworkForClass(classId),
+                ]);
+
+                setClassDetail(detail);
+                setMaterials(materialsData);
+                setHomework(homeworkData.map((hw) => ({
+                    ...hw,
+                    submissions: hw.submissions ?? [],
+                })));
+                setError(null);
+            } catch (err: any) {
+                setError(err.message || 'Failed to load class details');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchClassDetail();
     }, [classId]);
 
-    const roster = useMemo(() => {
-        if (!classInfo) return [];
-        if ('studentId' in classInfo) {
-            return allUsers.filter(u => u.id === classInfo.studentId);
+    const classTitle = classDetail?.type === 'GROUP'
+        ? classDetail.group?.title
+        : classDetail?.pair?.title;
+
+    const subject = classDetail?.type === 'GROUP'
+        ? classDetail.group?.subject
+        : classDetail?.pair?.subject;
+
+    const teacherName = classDetail?.type === 'GROUP'
+        ? classDetail.group?.teacher?.name
+        : classDetail?.pair?.teacher?.name;
+
+    const roster = useMemo((): User[] => {
+        if (classDetail?.type === 'GROUP') {
+            return classDetail.group?.members ?? [];
         }
-        const studentIds = new Set<string>();
-        allSchedule.forEach(session => {
-            if (session.classId === classId) {
-                session.attendees.forEach(id => studentIds.add(id));
-            }
-        });
-        return allUsers.filter(user => user.role === UserRole.STUDENT && studentIds.has(user.id));
-    }, [classInfo, classId]);
+        if (classDetail?.type === 'ONE_TO_ONE' && classDetail.pair?.student) {
+            return [classDetail.pair.student];
+        }
+        return [];
+    }, [classDetail]);
 
-    const materials = useMemo(() => allMaterials.filter(m => m.classId === classId), [classId]);
-    
-    if (!classInfo) {
-        return <Card title="Error"><p>Class not found.</p><Link to="/teacher/classes" className="text-primary hover:underline mt-4 inline-block">&larr; Back to all classes</Link></Card>;
-    }
+    const sessions: Session[] = useMemo(() => {
+        if (classDetail?.type === 'GROUP') {
+            return classDetail.group?.sessions ?? [];
+        }
+        if (classDetail?.type === 'ONE_TO_ONE') {
+            return classDetail.pair?.sessions ?? [];
+        }
+        return [];
+    }, [classDetail]);
 
-    const handleAssignFormSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        const newHomework: Homework = {
-            id: `h_${new Date().getTime()}`,
-            classId: classId!,
-            title: hwTitle,
-            instructions: hwInstructions,
-            dueAt: new Date(hwDueDate).toISOString(),
-            type: 'text',
-        };
-        setHomework(prev => [...prev, newHomework]);
-        // Also create PENDING submissions for all students in roster
-        const newSubmissions = roster.map(student => ({
-            submissionId: `sub_${new Date().getTime()}_${student.id}`,
-            homeworkId: newHomework.id,
-            studentId: student.id,
-            submittedAt: null,
-            content: {},
-            status: 'PENDING' as const,
-        }));
-        setSubmissions(prev => [...prev, ...newSubmissions]);
-
-        setIsAssignModalOpen(false);
-        setHwTitle('');
-        setHwInstructions('');
-        setHwDueDate('');
-    };
-    
     const openGradeModal = (submission: Submission) => {
         setCurrentSubmission(submission);
-        setGrade(submission.grade?.toString() || '');
-        setFeedback(submission.feedback || '');
+        setGrade(submission.grade?.toString() ?? '');
+        setFeedback(submission.feedback ?? '');
+        setGradeError(null);
         setIsGradeModalOpen(true);
     };
 
-    const handleGradeFormSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleGradeFormSubmit = async (event: React.FormEvent) => {
+        event.preventDefault();
         if (!currentSubmission) return;
-        setSubmissions(prev => prev.map(s => 
-            s.submissionId === currentSubmission.submissionId 
-            ? { ...s, status: 'GRADED', grade: Number(grade), feedback: feedback }
-            : s
-        ));
-        setIsGradeModalOpen(false);
-        setCurrentSubmission(null);
-    };
+        try {
+            setGradeError(null);
+            const updated = await api.gradeSubmission(currentSubmission.submissionId, {
+                grade: Number(grade),
+                feedback,
+            });
 
-    const getStatusBadge = (status: Submission['status']) => {
-        switch (status) {
-            case 'PENDING': return <span className="px-3 py-1 text-xs font-semibold rounded-md bg-warning/10 text-warning">{status}</span>;
-            case 'SUBMITTED': return <span className="px-3 py-1 text-xs font-semibold rounded-md bg-primary/10 text-primary">{status}</span>;
-            case 'GRADED': return <span className="px-3 py-1 text-xs font-semibold rounded-md bg-secondary/10 text-secondary">{status}</span>;
+            setHomework((prev) =>
+                prev.map((hw) => ({
+                    ...hw,
+                    submissions: hw.submissions.map((submission) =>
+                        submission.submissionId === updated.submissionId ? updated : submission,
+                    ),
+                })),
+            );
+
+            setIsGradeModalOpen(false);
+            setCurrentSubmission(null);
+        } catch (err: any) {
+            setGradeError(err.message || 'Failed to save grade');
         }
     };
-    
-    const currentStudentForGrading = allUsers.find(u => u.id === currentSubmission?.studentId);
 
-    const tabs = ['Roster', 'Materials', 'Homework'];
-    const tabClasses = (tabName: string) => 
-        `px-4 sm:px-6 py-3 font-semibold rounded-t-lg cursor-pointer transition-colors duration-200 whitespace-nowrap ${
-            activeTab === tabName ? 'bg-base-100 text-primary border-b-2 border-primary -mb-px' : 'bg-transparent text-text-secondary hover:text-primary'
-        }`;
+    if (loading) {
+        return <Card>Loading class details...</Card>;
+    }
+
+    if (error || !classDetail || !classTitle || !subject) {
+        return (
+            <Card title="Error">
+                <p>{error || 'Class not found.'}</p>
+                <Link to="/teacher/classes" className="text-primary hover:underline mt-4 inline-block">
+                    &larr; Back to all classes
+                </Link>
+            </Card>
+        );
+    }
+
+    const sessionsByDate = sessions
+        .map((session) => ({
+            ...session,
+            startsAtDate: new Date(session.startsAt),
+        }))
+        .sort((a, b) => a.startsAtDate.getTime() - b.startsAtDate.getTime());
 
     return (
         <>
-            <div className="space-y-6">
-                <Card>
-                    <Link to="/teacher/classes" className="text-sm text-primary hover:underline mb-4 block">&larr; Back to all classes</Link>
-                    <h2 className="text-3xl font-bold tracking-tight">{classInfo.title}</h2>
-                    <p className="text-text-secondary capitalize">{ 'subject' in classInfo ? classInfo.subject : ''} / { 'studentId' in classInfo ? 'One-to-One' : 'Group'}</p>
+            <Card>
+                <Link to="/teacher/classes" className="text-sm text-primary hover:underline mb-4 block">
+                    &larr; Back to all classes
+                </Link>
+                <h2 className="text-3xl font-bold tracking-tight">{classTitle}</h2>
+                <p className="text-text-secondary">{subject}</p>
+                <p className="text-sm text-text-secondary mt-2">Teacher: {teacherName || 'You'}</p>
+            </Card>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <Card title="Roster" className="lg:col-span-1">
+                    {roster.length === 0 ? (
+                        <p className="text-text-secondary">No students enrolled yet.</p>
+                    ) : (
+                        <ul className="space-y-3">
+                            {roster.map((student) => (
+                                <li key={student.id} className="flex items-center gap-3">
+                                    <img
+                                        src={student.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(student.name)}`}
+                                        alt={student.name}
+                                        className="w-10 h-10 rounded-full object-cover"
+                                    />
+                                    <div>
+                                        <p className="font-semibold text-neutral">{student.name}</p>
+                                        <p className="text-sm text-text-secondary">{student.email}</p>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
                 </Card>
 
-                <div>
-                    <div className="border-b border-slate-300 flex overflow-x-auto">
-                        {tabs.map(tab => (<button key={tab} onClick={() => setActiveTab(tab)} className={tabClasses(tab)}>{tab}</button>))}
-                    </div>
-                    <Card className="rounded-t-none min-h-[400px]">
-                        {activeTab === 'Roster' && (
-                            <div>Roster content...</div>
-                        )}
-                        {activeTab === 'Materials' && (
-                             <div>Materials content...</div>
-                        )}
-                        {activeTab === 'Homework' && (
-                             <div>
-                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                                    <h3 className="text-xl font-semibold text-neutral">Assigned Homework</h3>
-                                    <button onClick={() => setIsAssignModalOpen(true)} className="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-secondary to-green-400 text-white font-semibold rounded-lg hover:shadow-lg transform hover:-translate-y-1 transition-all duration-200">+ Assign Homework</button>
-                                </div>
-                                 {homework.length > 0 ? (
-                                    <div className="space-y-6">
-                                        {homework.map(hw => (
-                                            <div key={hw.id}>
-                                                <h4 className="font-bold text-lg text-neutral">{hw.title}</h4>
-                                                <p className="text-sm text-text-secondary mb-2">Due: {new Date(hw.dueAt).toLocaleDateString()}</p>
-                                                <div className="overflow-x-auto">
-                                                    <table className="w-full text-left text-sm min-w-[400px]">
-                                                        <thead className="bg-base-200/60">
-                                                            <tr>
-                                                                <th className="p-2 font-semibold text-text-secondary">Student</th>
-                                                                <th className="p-2 font-semibold text-text-secondary">Status</th>
-                                                                <th className="p-2 font-semibold text-text-secondary">Actions</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {roster.map(student => {
-                                                                const submission = submissions.find(s => s.homeworkId === hw.id && s.studentId === student.id);
-                                                                return (
-                                                                    <tr key={student.id} className="border-b border-slate-200/75">
-                                                                        <td className="p-2 font-medium text-neutral">{student.name}</td>
-                                                                        <td className="p-2">{getStatusBadge(submission?.status || 'PENDING')}</td>
-                                                                        <td className="p-2">
-                                                                            {submission?.status === 'SUBMITTED' && <button onClick={() => openGradeModal(submission)} className="font-semibold text-primary hover:underline">Grade</button>}
-                                                                            {submission?.status === 'GRADED' && <button onClick={() => openGradeModal(submission)} className="font-semibold text-secondary hover:underline">View Grade</button>}
-                                                                        </td>
-                                                                    </tr>
-                                                                )
-                                                            })}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </div>
-                                        ))}
+                <Card title="Upcoming Sessions" className="lg:col-span-2">
+                    {sessionsByDate.length === 0 ? (
+                        <p className="text-text-secondary">No sessions scheduled.</p>
+                    ) : (
+                        <ul className="space-y-3">
+                            {sessionsByDate.map((session) => (
+                                <li
+                                    key={session.id}
+                                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 bg-base-200/50 rounded-lg"
+                                >
+                                    <div>
+                                        <p className="font-semibold text-neutral">{session.title}</p>
+                                        <p className="text-sm text-text-secondary">
+                                            {session.startsAtDate.toLocaleString(undefined, {
+                                                dateStyle: 'medium',
+                                                timeStyle: 'short',
+                                            })}
+                                        </p>
                                     </div>
-                                ) : <p className="text-center text-text-secondary py-8">No homework assigned for this class yet.</p>}
-                             </div>
-                        )}
-                    </Card>
-                </div>
+                                    <Link
+                                        to={`/teacher/session/${session.id}`}
+                                        className="mt-3 sm:mt-0 px-4 py-2 bg-gradient-to-r from-primary to-blue-400 text-white font-semibold rounded-lg hover:shadow-lg transition"
+                                    >
+                                        Open session
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </Card>
             </div>
 
-            {/* FIX: Moved form content inside the Modal component to pass it as the 'children' prop. */}
-            <Modal isOpen={isAssignModalOpen} onClose={() => setIsAssignModalOpen(false)} title="Assign New Homework">
-                <form onSubmit={handleAssignFormSubmit} className="space-y-4">
-                    <div>
-                        <label htmlFor="hwTitle" className="block text-sm font-medium text-neutral">Title</label>
-                        <input id="hwTitle" type="text" value={hwTitle} onChange={e => setHwTitle(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition" />
+            <Card title="Materials">
+                {materials.length === 0 ? (
+                    <p className="text-text-secondary">No materials uploaded yet.</p>
+                ) : (
+                    <ul className="space-y-3">
+                        {materials.map((material) => (
+                            <li key={material.id} className="p-3 bg-base-200/60 rounded-lg flex justify-between items-center">
+                                <div>
+                                    <p className="font-semibold text-neutral">{material.title}</p>
+                                    <p className="text-sm text-text-secondary uppercase">{material.type}</p>
+                                </div>
+                                <a
+                                    href={material.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-primary hover:underline font-semibold"
+                                >
+                                    View
+                                </a>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </Card>
+
+            <Card title="Homework">
+                {homework.length === 0 ? (
+                    <p className="text-text-secondary">No homework assigned yet.</p>
+                ) : (
+                    <div className="space-y-4">
+                        {homework.map((hw) => (
+                            <div key={hw.id} className="p-4 bg-base-200/60 rounded-xl">
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-neutral">{hw.title}</h3>
+                                        <p className="text-sm text-text-secondary">Due: {new Date(hw.dueAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                                        <p className="text-sm text-text-secondary mt-2 max-w-2xl">{hw.instructions}</p>
+                                    </div>
+                                    <span className="px-3 py-1 text-xs font-semibold rounded-md bg-primary/10 text-primary uppercase">
+                                        {hw.type}
+                                    </span>
+                                </div>
+
+                                <div className="mt-4">
+                                    <h4 className="text-sm font-semibold text-neutral uppercase tracking-wide mb-2">Submissions</h4>
+                                    {hw.submissions.length === 0 ? (
+                                        <p className="text-text-secondary text-sm">No submissions yet.</p>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {hw.submissions.map((submission) => (
+                                                <div
+                                                    key={submission.submissionId}
+                                                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 bg-base-100 rounded-lg border border-base-200"
+                                                >
+                                                    <div>
+                                                        <p className="font-semibold text-neutral">Student ID: {submission.studentId}</p>
+                                                        <p className="text-sm text-text-secondary">
+                                                            Status: {submission.status}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex items-center gap-3 mt-3 sm:mt-0">
+                                                        {submission.status === 'GRADED' && (
+                                                            <span className="px-3 py-1 text-xs font-semibold rounded-md bg-secondary/10 text-secondary">
+                                                                {submission.grade}%
+                                                            </span>
+                                                        )}
+                                                        <button
+                                                            onClick={() => openGradeModal(submission)}
+                                                            className="px-4 py-2 text-sm font-semibold rounded-lg bg-gradient-to-r from-primary to-blue-400 text-white hover:shadow-lg transition"
+                                                        >
+                                                            {submission.status === 'GRADED' ? 'Update Grade' : 'Grade'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
                     </div>
-                    <div>
-                        <label htmlFor="hwInstructions" className="block text-sm font-medium text-neutral">Instructions</label>
-                        <textarea id="hwInstructions" value={hwInstructions} onChange={e => setHwInstructions(e.target.value)} required rows={4} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition" />
-                    </div>
-                    <div>
-                        <label htmlFor="hwDueDate" className="block text-sm font-medium text-neutral">Due Date</label>
-                        <input id="hwDueDate" type="datetime-local" value={hwDueDate} onChange={e => setHwDueDate(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm" />
-                    </div>
-                    <div className="flex justify-end space-x-3 pt-4 border-t mt-6">
-                        <button type="button" onClick={() => setIsAssignModalOpen(false)} className="px-4 py-2 bg-base-200 text-neutral font-semibold rounded-lg hover:bg-base-300 transition">
-                            Cancel
-                        </button>
-                        <button type="submit" className="px-5 py-2.5 bg-gradient-to-r from-primary to-blue-400 text-white font-semibold rounded-lg hover:shadow-lg transform hover:-translate-y-1 transition-all duration-200">
-                            Assign Homework
-                        </button>
-                    </div>
-                </form>
-            </Modal>
-            
-            <Modal isOpen={isGradeModalOpen} onClose={() => setIsGradeModalOpen(false)} title={`Grade Submission: ${currentStudentForGrading?.name}`}>
+                )}
+            </Card>
+
+            <Modal
+                isOpen={isGradeModalOpen}
+                onClose={() => setIsGradeModalOpen(false)}
+                title={`Grade Submission: ${currentSubmission?.studentId ?? ''}`}
+            >
                 {currentSubmission && (
                     <form onSubmit={handleGradeFormSubmit} className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-neutral">Student's Submission</label>
+                            <label className="block text-sm font-medium text-neutral">Student submission</label>
                             <div className="mt-1 p-3 bg-base-200/50 rounded-lg border h-32 overflow-y-auto">
-                                <p>{currentSubmission.content.text || "No text content."}</p>
+                                <p>{currentSubmission.content.text || 'No text submitted.'}</p>
                             </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label htmlFor="grade" className="block text-sm font-medium text-neutral">Grade (out of 100)</label>
-                                <input id="grade" type="number" value={grade} onChange={e => setGrade(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm" />
+                                <label htmlFor="grade" className="block text-sm font-medium text-neutral">
+                                    Grade (out of 100)
+                                </label>
+                                <input
+                                    id="grade"
+                                    type="number"
+                                    value={grade}
+                                    onChange={(e) => setGrade(e.target.value)}
+                                    required
+                                    min={0}
+                                    max={100}
+                                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm"
+                                />
                             </div>
                         </div>
                         <div>
                             <label htmlFor="feedback" className="block text-sm font-medium text-neutral">Feedback</label>
-                            <textarea id="feedback" value={feedback} onChange={e => setFeedback(e.target.value)} required rows={4} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm" />
+                            <textarea
+                                id="feedback"
+                                value={feedback}
+                                onChange={(e) => setFeedback(e.target.value)}
+                                required
+                                rows={4}
+                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm"
+                            />
                         </div>
+                        {gradeError && <p className="text-error text-sm">{gradeError}</p>}
                         <div className="flex justify-end space-x-3 pt-4 border-t mt-6">
-                            <button type="button" onClick={() => setIsGradeModalOpen(false)} className="px-4 py-2 bg-base-200 text-neutral font-semibold rounded-lg hover:bg-base-300 transition">Cancel</button>
-                            <button type="submit" className="px-5 py-2.5 bg-gradient-to-r from-primary to-blue-400 text-white font-semibold rounded-lg hover:shadow-lg transform hover:-translate-y-1 transition-all duration-200">Save Grade</button>
+                            <button
+                                type="button"
+                                onClick={() => setIsGradeModalOpen(false)}
+                                className="px-4 py-2 bg-base-200 text-neutral font-semibold rounded-lg hover:bg-base-300 transition"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                className="px-5 py-2.5 bg-gradient-to-r from-primary to-blue-400 text-white font-semibold rounded-lg hover:shadow-lg transform hover:-translate-y-1 transition-all duration-200"
+                            >
+                                Save Grade
+                            </button>
                         </div>
                     </form>
                 )}

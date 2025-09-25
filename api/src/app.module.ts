@@ -11,6 +11,7 @@ import { HomeworkModule } from './homework/homework.module.js';
 import { SubmissionsModule } from './submissions/submissions.module.js';
 import { ChessModule } from './chess/chess.module.js';
 import { HealthModule } from './health/health.module.js';
+import { PairsModule } from './pairs/pairs.module.js';
 import configuration from './config/configuration.js';
 
 @Module({
@@ -23,6 +24,7 @@ import configuration from './config/configuration.js';
     AuthModule,
     UsersModule,
     GroupsModule,
+    PairsModule,
     ScheduleModule,
     LivekitModule,
     MaterialsModule,

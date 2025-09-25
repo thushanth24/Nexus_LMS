@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+﻿import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service.js';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { UserRole } from '../prisma-enums.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
 import { CreateTeacherDto } from './dto/create-teacher.dto.js';
+import { CreateStudentDto } from './dto/create-student.dto.js';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -15,6 +16,12 @@ export class UsersController {
   @Roles(UserRole.ADMIN)
   createTeacher(@Body() createTeacherDto: CreateTeacherDto) {
     return this.usersService.createTeacher(createTeacherDto);
+  }
+
+  @Post('students')
+  @Roles(UserRole.ADMIN)
+  createStudent(@Body() createStudentDto: CreateStudentDto) {
+    return this.usersService.createStudent(createStudentDto);
   }
 
   @Get('teachers')

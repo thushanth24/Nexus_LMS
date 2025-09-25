@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Card from '../../components/ui/Card';
 import Modal from '../../components/ui/Modal';
@@ -12,6 +11,8 @@ const AdminGroups: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [formError, setFormError] = useState<string | null>(null);
 
     // Form State
     const [title, setTitle] = useState('');
@@ -41,35 +42,53 @@ const AdminGroups: React.FC = () => {
         fetchData();
     }, []);
 
-    const handleFormSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!teacherId) {
-            alert("Please select a teacher.");
-            return;
-        }
-
-        const newGroup: Group = {
-            id: `g_${new Date().getTime()}`,
-            title,
-            subject,
-            teacherId,
-            meetingDays: meetingDays.split(',').map(s => s.trim()),
-            cap: Number(cap),
-            levelSpread: levelSpread.split(',').map(s => s.trim()),
-            currentSize: 0, // New groups start empty
-            durationMin: 60, // Default
-        };
-        // NOTE: This is a client-side only update.
-        setGroups(prev => [...prev, newGroup]);
-
-        // Close and reset
-        setIsModalOpen(false);
+    const resetForm = () => {
         setTitle('');
         setSubject('');
         setTeacherId('');
         setMeetingDays('');
         setCap(10);
         setLevelSpread('');
+        setFormError(null);
+        setIsSubmitting(false);
+    };
+
+    const handleFormSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!teacherId) {
+            setFormError('Please select a teacher.');
+            return;
+        }
+
+        const formattedMeetingDays = meetingDays.split(',').map(s => s.trim()).filter(Boolean);
+        const formattedLevelSpread = levelSpread.split(',').map(s => s.trim()).filter(Boolean);
+
+        if (!formattedMeetingDays.length || !formattedLevelSpread.length) {
+            setFormError('Provide at least one meeting day and level.');
+            return;
+        }
+
+        try {
+            setIsSubmitting(true);
+            setFormError(null);
+            const payload = {
+                title,
+                subject,
+                teacherId,
+                meetingDays: formattedMeetingDays,
+                cap: Number(cap),
+                levelSpread: formattedLevelSpread,
+                durationMin: 60,
+            };
+            const createdGroup = await api.createGroup(payload);
+            setGroups(prev => [createdGroup, ...prev]);
+            setIsModalOpen(false);
+            resetForm();
+        } catch (err: any) {
+            const message = err?.message || 'Failed to create group';
+            setFormError(message);
+            setIsSubmitting(false);
+        }
     };
     
     const getTeacherName = (id: string) => teachers.find(t => t.id === id)?.name || 'N/A';
@@ -80,7 +99,7 @@ const AdminGroups: React.FC = () => {
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
                      <h2 className="text-2xl font-bold tracking-tight text-neutral">Manage Groups</h2>
                     <button
-                        onClick={() => setIsModalOpen(true)}
+                        onClick={() => { setIsModalOpen(true); resetForm(); }}
                         className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-primary to-blue-400 text-white font-semibold rounded-lg hover:shadow-lg transform hover:-translate-y-1 transition-all duration-200"
                     >
                         + Create Group
@@ -116,7 +135,7 @@ const AdminGroups: React.FC = () => {
                 )}
             </Card>
 
-            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create New Group">
+            <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); resetForm(); }} title="Create New Group">
                 <form onSubmit={handleFormSubmit} className="space-y-4">
                     <div>
                         <label htmlFor="title" className="block text-sm font-medium text-neutral">Group Title</label>
@@ -135,7 +154,7 @@ const AdminGroups: React.FC = () => {
                     </div>
                     <div>
                         <label htmlFor="cap" className="block text-sm font-medium text-neutral">Capacity</label>
-                        <input id="cap" type="number" value={cap} onChange={e => setCap(Number(e.target.value))} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition" />
+                        <input id="cap" type="number" value={cap} min={1} onChange={e => setCap(Number(e.target.value))} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition" />
                     </div>
                     <div>
                         <label htmlFor="levelSpread" className="block text-sm font-medium text-neutral">Levels (e.g. B1, B2)</label>
@@ -145,13 +164,13 @@ const AdminGroups: React.FC = () => {
                         <label htmlFor="meetingDays" className="block text-sm font-medium text-neutral">Meeting Days (e.g. Mon, Wed)</label>
                         <input id="meetingDays" type="text" value={meetingDays} onChange={e => setMeetingDays(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition" />
                     </div>
-
+                    {formError && <p className="text-error text-sm">{formError}</p>}
                     <div className="flex justify-end space-x-3 pt-4 border-t mt-6">
-                        <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-base-200 text-neutral font-semibold rounded-lg hover:bg-base-300 transition">
+                        <button type="button" onClick={() => { setIsModalOpen(false); resetForm(); }} className="px-4 py-2 bg-base-200 text-neutral font-semibold rounded-lg hover:bg-base-300 transition">
                             Cancel
                         </button>
-                        <button type="submit" className="px-5 py-2.5 bg-gradient-to-r from-primary to-blue-400 text-white font-semibold rounded-lg hover:shadow-lg transform hover:-translate-y-1 transition-all duration-200">
-                            Create Group
+                        <button type="submit" disabled={isSubmitting} className="px-5 py-2.5 bg-gradient-to-r from-primary to-blue-400 text-white font-semibold rounded-lg hover:shadow-lg transform hover:-translate-y-1 transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed">
+                            {isSubmitting ? 'Creating...' : 'Create Group'}
                         </button>
                     </div>
                 </form>

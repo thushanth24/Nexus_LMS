@@ -177,9 +177,9 @@ model ChessPreset {
 // Join tables for many-to-many relationships
 model GroupMemberLink {
   group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  groupId String
+  groupId String @map("A")
   user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId  String
+  userId  String @map("B")
 
   @@id([groupId, userId])
   @@map("_GroupMembers")
@@ -187,12 +187,17 @@ model GroupMemberLink {
 
 model SessionAttendeeLink {
   session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  sessionId String
+  sessionId String @map("A")
   user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    String
+  userId    String @map("B")
 
   @@id([sessionId, userId])
   @@map("_SessionAttendees")
 }
+
+
+
+
+
 
 

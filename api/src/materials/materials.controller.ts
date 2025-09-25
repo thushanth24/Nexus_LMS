@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Request, UseGuards } from '@nestjs/common';
 import { MaterialsService } from './materials.service.js';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
@@ -18,5 +18,11 @@ export class MaterialsController {
       createPresignedUrlDto.fileName,
       createPresignedUrlDto.fileType,
     );
+  }
+
+  @Get('class/:classId')
+  @Roles(UserRole.ADMIN, UserRole.TEACHER, UserRole.STUDENT)
+  listForClass(@Param('classId') classId: string, @Request() req) {
+    return this.materialsService.listForClass(classId, req.user);
   }
 }

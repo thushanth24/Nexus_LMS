@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseGuards, Request } from '@nestjs/common';
+﻿import { Controller, Get, Param, UseGuards, Request } from '@nestjs/common';
 import { HomeworkService } from './homework.service.js';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
@@ -10,13 +10,13 @@ import { UserRole } from '../prisma-enums.js';
 export class HomeworkController {
   constructor(private readonly homeworkService: HomeworkService) {}
 
-  @Get('my-class/:classId')
-  @Roles(UserRole.TEACHER)
+  @Get('class/:classId')
+  @Roles(UserRole.TEACHER, UserRole.ADMIN)
   findForClass(@Param('classId') classId: string) {
     return this.homeworkService.findByClass(classId);
   }
 
-  @Get('my-homework')
+  @Get('me')
   @Roles(UserRole.STUDENT)
   findMyHomework(@Request() req) {
     return this.homeworkService.findForStudent(req.user.userId);

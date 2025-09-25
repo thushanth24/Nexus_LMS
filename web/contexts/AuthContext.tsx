@@ -1,10 +1,10 @@
-import React, { createContext, useState, ReactNode, useEffect, useCallback } from 'react';
+﻿import React, { createContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import { User } from '../types';
 import * as api from '../services/api';
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   isLoading: boolean;
 }
@@ -22,7 +22,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const userData = await api.getMe();
         setUser(userData);
       } catch (error) {
-        console.error("Failed to fetch user profile, logging out.", error);
+        console.error('Failed to fetch user profile, logging out.', error);
         localStorage.removeItem('nexus-lms-token');
         setUser(null);
       }
@@ -34,19 +34,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     loadUser();
   }, [loadUser]);
 
-  const login = async (email: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<boolean> => {
     try {
       setIsLoading(true);
-      const { access_token } = await api.login(email);
+      const { access_token } = await api.login(email, password);
       if (access_token) {
         localStorage.setItem('nexus-lms-token', access_token);
-        await loadUser(); // Fetch and set user data
+        await loadUser();
         return true;
       }
       setIsLoading(false);
       return false;
     } catch (error) {
-      console.error("Login failed", error);
+      console.error('Login failed', error);
       setIsLoading(false);
       return false;
     }

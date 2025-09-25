@@ -249,3 +249,9 @@ CREATE INDEX "Homework_pairId_idx" ON "Homework"("pairId");
 CREATE INDEX "Submission_homeworkId_idx" ON "Submission"("homeworkId");
 CREATE INDEX "Submission_studentId_idx" ON "Submission"("studentId");
 CREATE INDEX "ChessPreset_ownerId_idx" ON "ChessPreset"("ownerId");
+
+
+
+admin creation
+
+npm run create:admin -- --email "admin@inst.com" --name "Admin User" --password "demo123"

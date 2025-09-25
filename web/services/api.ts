@@ -1,44 +1,47 @@
-import { User, Session, Group, Homework, Submission, ChessPreset } from '../types';
+import { User, Session, Group, OneToOne, Homework, Submission, ChessPreset, Material } from '../types';
 
-const API_BASE_URL = 'http://localhost:3000'; // Update this with your backend URL if different
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+
+interface RequestOptions {
+    method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+    body?: unknown;
+}
 
 // Helper for making API calls
-const api = {
-    get: async <T>(endpoint: string): Promise<T> => {
-        const token = localStorage.getItem('nexus-lms-token');
-        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-            headers: {
-                'Authorization': token ? `Bearer ${token}` : '',
-                'Content-Type': 'application/json',
-            },
-        });
+const api = async <T>(endpoint: string, options: RequestOptions = {}): Promise<T> => {
+    const token = localStorage.getItem('nexus-lms-token');
+    const headers: Record<string, string> = {};
 
-        if (!response.ok) {
-            const error = await response.json().catch(() => ({}));
-            throw new Error(error.message || 'Something went wrong');
-        }
+    const isFormData = options.body instanceof FormData;
 
-        return response.json();
-    },
+    if (!isFormData) {
+        headers['Content-Type'] = 'application/json';
+    }
 
-    post: async <T>(endpoint: string, data: any): Promise<T> => {
-        const token = localStorage.getItem('nexus-lms-token');
-        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': token ? `Bearer ${token}` : '',
-            },
-            body: JSON.stringify(data),
-        });
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
 
-        if (!response.ok) {
-            const error = await response.json().catch(() => ({}));
-            throw new Error(error.message || 'Something went wrong');
-        }
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: options.method ?? 'GET',
+        headers,
+        body: isFormData
+            ? (options.body as FormData)
+            : options.body !== undefined
+                ? JSON.stringify(options.body)
+                : undefined,
+    });
 
-        return response.json();
-    },
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || 'Something went wrong');
+    }
+
+    if (response.status === 204) {
+        return undefined as T;
+    }
+
+    return response.json();
 };
 
 export interface InviteTeacherPayload {
@@ -50,73 +53,101 @@ export interface InviteTeacherPayload {
     avatarUrl?: string | null;
 }
 
+export interface CreateStudentPayload {
+    name: string;
+    email: string;
+    password: string;
+    level?: string;
+    timezone?: string;
+    avatarUrl?: string | null;
+}
+
+export interface CreateGroupPayload {
+    title: string;
+    subject: string;
+    teacherId: string;
+    meetingDays: string[];
+    cap: number;
+    levelSpread: string[];
+    durationMin?: number;
+}
+
+export interface GradeSubmissionPayload {
+    grade: number;
+    feedback: string;
+}
+
+export interface SubmitHomeworkPayload {
+    homeworkId: string;
+    content: { text?: string };
+}
+
 // --- AUTH ---
-export const login = async (email: string, password: string = 'demo123'): Promise<{ access_token: string }> => {
-    try {
-        const response = await api.post<{ access_token: string }>('/auth/login', { email, password });
-        localStorage.setItem('nexus-lms-token', response.access_token);
-        return response;
-    } catch (error) {
-        console.error('Login failed:', error);
-        throw error;
-    }
+export const login = async (email: string, password: string): Promise<{ access_token: string }> => {
+    const response = await api<{ access_token: string }>(`/auth/login`, {
+        method: 'POST',
+        body: { email, password },
+    });
+    localStorage.setItem('nexus-lms-token', response.access_token);
+    return response;
 };
 
-export const getMe = async (): Promise<User> => {
-    try {
-        const user = await api.get<User>('/auth/me');
-        return user;
-    } catch (error) {
-        console.error('Failed to fetch user profile:', error);
-        throw error;
-    }
-};
+export const getMe = async (): Promise<User> => api<User>('/auth/me');
 
 // --- USERS ---
-export const getTeachers = async (): Promise<User[]> => {
-    return api.get<User[]>('/users/teachers');
-};
+export const getTeachers = async (): Promise<User[]> => api<User[]>('/users/teachers');
 
-export const inviteTeacher = async (payload: InviteTeacherPayload): Promise<User> => {
-    return api.post<User>('/users/teachers', payload);
-};
+export const inviteTeacher = async (payload: InviteTeacherPayload): Promise<User> =>
+    api<User>('/users/teachers', { method: 'POST', body: payload });
 
-export const getStudents = async (): Promise<User[]> => {
-    return api.get<User[]>('/users/students');
-};
+export const getStudents = async (): Promise<User[]> => api<User[]>('/users/students');
 
-// --- CLASSES ---
-export const getGroups = async (): Promise<Group[]> => {
-    return api.get<Group[]>('/groups');
-};
+export const createStudent = async (payload: CreateStudentPayload): Promise<User> =>
+    api<User>('/users/students', { method: 'POST', body: payload });
 
-export const getGroupById = async (id: string): Promise<Group> => {
-    return api.get<Group>(`/groups/${id}`);
-};
+// --- GROUPS ---
+export const getGroups = async (): Promise<Group[]> => api<Group[]>('/groups');
 
-// --- SCHEDULE ---
-export const getMySessions = async (): Promise<Session[]> => {
-    return api.get<Session[]>('/schedule/my-sessions');
-};
+export const getMyTeachingGroups = async (): Promise<Group[]> => api<Group[]>('/groups/teaching');
+
+export const getMyEnrolledGroups = async (): Promise<Group[]> => api<Group[]>('/groups/enrolled');
+
+export const createGroup = async (payload: CreateGroupPayload): Promise<Group> =>
+    api<Group>('/groups', { method: 'POST', body: payload });
+
+export const getGroupById = async (id: string): Promise<Group> => api<Group>(`/groups/${id}`);
+
+// --- PAIRS ---
+export const getMyTeachingPairs = async (): Promise<OneToOne[]> => api<OneToOne[]>('/pairs/teaching');
+
+export const getMyEnrolledPairs = async (): Promise<OneToOne[]> => api<OneToOne[]>('/pairs/enrolled');
+
+export const getPairById = async (id: string): Promise<OneToOne> => api<OneToOne>(`/pairs/${id}`);
+
+// --- MATERIALS ---
+export const getMaterialsForClass = async (classId: string): Promise<Material[]> =>
+    api<Material[]>(`/materials/class/${classId}`);
+
+// --- SESSIONS / SCHEDULE ---
+export const getMySessions = async (): Promise<Session[]> => api<Session[]>('/schedule/my-sessions');
+
+export const getSessionById = async (sessionId: string): Promise<Session> =>
+    api<Session>(`/schedule/${sessionId}`);
 
 // --- HOMEWORK & SUBMISSIONS ---
-export const getHomeworkForClass = async (classId: string): Promise<Homework[]> => {
-    return api.get<Homework[]>(`/homework/class/${classId}`);
-};
+export const getHomeworkForClass = async (classId: string): Promise<Homework[]> =>
+    api<Homework[]>(`/homework/class/${classId}`);
 
-export const getMyHomework = async (): Promise<(Homework & { submissions: Submission[] })[]> => {
-    return api.get<(Homework & { submissions: Submission[] })[]>('/homework/me');
-};
+export const getMyHomework = async (): Promise<(Homework & { submissions: Submission[] })[]> =>
+    api<(Homework & { submissions: Submission[] })[]>('/homework/me');
 
-export const submitHomework = async (data: { homeworkId: string; content: { text?: string } }): Promise<{ success: boolean }> => {
-    return api.post<{ success: boolean }>('/homework/submit', data);
-};
+export const submitHomework = async (data: SubmitHomeworkPayload): Promise<Submission> =>
+    api<Submission>('/submissions', { method: 'POST', body: data });
 
-export const gradeSubmission = async (submissionId: string, data: { grade: number; feedback: string }): Promise<{ success: boolean }> => {
-    return api.post<{ success: boolean }>(`/submissions/${submissionId}/grade`, data);
-};
+export const gradeSubmission = async (submissionId: string, data: GradeSubmissionPayload): Promise<Submission> =>
+    api<Submission>(`/submissions/${submissionId}/grade`, { method: 'PATCH', body: data });
 
 // --- CHESS ---
-export const getChessPresets = async (): Promise<ChessPreset[]> => {
-    return api.get<ChessPreset[]>('/chess/presets');
-};
+export const getChessPresets = async (): Promise<ChessPreset[]> => api<ChessPreset[]>('/chess/presets');
+
+

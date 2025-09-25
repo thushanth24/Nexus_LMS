@@ -1,5 +1,0 @@
-
-[
-  {"submissionId":"sub_10","homeworkId":"h_1","studentId":"s_10","submittedAt":"2025-09-23T09:00:00Z","content":{"text":"Here is my essay on urban development..."},"status":"SUBMITTED","graded":false},
-  {"submissionId":"sub_11","homeworkId":"h_2","studentId":"s_10","submittedAt":null,"content":{},"status":"PENDING","graded":false}
-]

@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import Card from '../components/ui/Card';
 
@@ -12,9 +11,13 @@ const LoginPage: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!auth) {
+            return;
+        }
+
         setError('');
         setIsSubmitting(true);
-        const success = await auth.login(email);
+        const success = await auth.login(email, password);
         if (!success) {
             setError('Invalid credentials. Please try again.');
         }
@@ -66,12 +69,6 @@ const LoginPage: React.FC = () => {
                             </button>
                         </div>
 
-                         <div className="text-center text-sm text-text-secondary">
-                            <p>Admin: <button type="button" onClick={() => setEmail('admin@inst.com')} className="font-medium text-primary hover:underline">admin@inst.com</button></p>
-                            <p>Teacher: <button type="button" onClick={() => setEmail('teacher@inst.com')} className="font-medium text-primary hover:underline">teacher@inst.com</button></p>
-                            <p>Student: <button type="button" onClick={() => setEmail('student@inst.com')} className="font-medium text-primary hover:underline">student@inst.com</button></p>
-                            <p className="mt-2">(Any password will work)</p>
-                        </div>
                     </form>
                 </Card>
             </div>
