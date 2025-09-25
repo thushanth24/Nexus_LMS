@@ -1,7 +1,7 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service.js';
-import { CreateGroupDto } from './dto/create-group.dto.js';
-import { UserRole } from '../prisma-enums.js';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service.js";
+import { CreateGroupDto } from "./dto/create-group.dto.js";
+import { UserRole } from "../prisma-enums.js";
 
 export interface SanitizedUser {
   id: string;
@@ -17,7 +17,7 @@ export interface SanitizedUser {
 export interface SerializedGroupSession {
   id: string;
   classId: string;
-  type: 'GROUP' | 'ONE_TO_ONE';
+  type: "GROUP" | "ONE_TO_ONE";
   title: string;
   teacherId: string;
   attendees: string[];
@@ -51,6 +51,20 @@ interface SerializeOptions {
 export class GroupsService {
   constructor(private prisma: PrismaService) {}
 
+  private readonly groupDetailInclude = {
+    _count: { select: { members: true } },
+    teacher: true,
+    members: true,
+    sessions: {
+      orderBy: { startsAt: "asc" },
+      include: {
+        attendees: { select: { id: true } },
+        group: { select: { title: true, teacherId: true } },
+        pair: { select: { title: true, teacherId: true } },
+      },
+    },
+  } as const;
+
   private sanitizeUser(user: any): SanitizedUser {
     return {
       id: user.id,
@@ -72,17 +86,17 @@ export class GroupsService {
     return sessions.map((session) => {
       const classId = session.groupId ?? session.pairId ?? session.id;
       const title =
-        session.title ?? session.group?.title ?? session.pair?.title ?? 'Session';
+        session.title ?? session.group?.title ?? session.pair?.title ?? "Session";
       const teacherId =
         session.group?.teacherId ??
         session.pair?.teacherId ??
         session.teacherId ??
-        '';
+        "";
 
       return {
         id: session.id,
         classId,
-        type: session.groupId ? 'GROUP' : 'ONE_TO_ONE',
+        type: session.groupId ? "GROUP" : "ONE_TO_ONE",
         title,
         teacherId,
         attendees: Array.isArray(session.attendees)
@@ -101,7 +115,7 @@ export class GroupsService {
 
   private serializeGroup(group: any, options: SerializeOptions = {}): SerializedGroup {
     const memberCount =
-      typeof group._count?.members === 'number'
+      typeof group._count?.members === "number"
         ? group._count.members
         : Array.isArray(group.members)
         ? group.members.length
@@ -134,13 +148,30 @@ export class GroupsService {
     return serialized;
   }
 
+  private async getSerializedGroup(id: string): Promise<SerializedGroup> {
+    const group = await this.prisma.group.findUnique({
+      where: { id },
+      include: this.groupDetailInclude,
+    });
+
+    if (!group) {
+      throw new NotFoundException("Group not found");
+    }
+
+    return this.serializeGroup(group, {
+      includeTeacher: true,
+      includeMembers: true,
+      includeSessions: true,
+    });
+  }
+
   async findAll(): Promise<SerializedGroup[]> {
     const groups = await this.prisma.group.findMany({
       include: {
         _count: { select: { members: true } },
       },
       orderBy: {
-        createdAt: 'desc',
+        createdAt: "desc",
       },
     });
 
@@ -154,7 +185,7 @@ export class GroupsService {
         _count: { select: { members: true } },
       },
       orderBy: {
-        createdAt: 'desc',
+        createdAt: "desc",
       },
     });
 
@@ -173,7 +204,7 @@ export class GroupsService {
         teacher: true,
       },
       orderBy: {
-        createdAt: 'desc',
+        createdAt: "desc",
       },
     });
 
@@ -188,19 +219,7 @@ export class GroupsService {
   ): Promise<SerializedGroup | null> {
     const group = await this.prisma.group.findUnique({
       where: { id },
-      include: {
-        _count: { select: { members: true } },
-        teacher: true,
-        members: true,
-        sessions: {
-          orderBy: { startsAt: 'asc' },
-          include: {
-            attendees: { select: { id: true } },
-            group: { select: { title: true, teacherId: true } },
-            pair: { select: { title: true, teacherId: true } },
-          },
-        },
-      },
+      include: this.groupDetailInclude,
     });
 
     if (!group) {
@@ -214,7 +233,7 @@ export class GroupsService {
       : false;
 
     if (!isAdmin && !isTeacher && !isMember) {
-      throw new ForbiddenException('You do not have access to this group');
+      throw new ForbiddenException("You do not have access to this group");
     }
 
     return this.serializeGroup(group, {
@@ -244,4 +263,129 @@ export class GroupsService {
 
     return this.serializeGroup(group);
   }
+
+  async updateTeacher(id: string, teacherId: string): Promise<SerializedGroup> {
+    const groupExists = await this.prisma.group.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    if (!groupExists) {
+      throw new NotFoundException("Group not found");
+    }
+
+    const teacher = await this.prisma.user.findUnique({
+      where: { id: teacherId },
+      select: { id: true, role: true },
+    });
+
+    if (!teacher || teacher.role !== UserRole.TEACHER) {
+      throw new BadRequestException("Teacher not found");
+    }
+
+    await this.prisma.group.update({
+      where: { id },
+      data: {
+        teacher: {
+          connect: { id: teacherId },
+        },
+      },
+    });
+
+    return this.getSerializedGroup(id);
+  }
+
+  async enrollStudents(id: string, studentIds: string[]): Promise<SerializedGroup> {
+    const uniqueIds = Array.from(new Set(studentIds.filter(Boolean)));
+
+    if (uniqueIds.length === 0) {
+      throw new BadRequestException("Provide at least one student to enroll");
+    }
+
+    const group = await this.prisma.group.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        cap: true,
+        members: { select: { id: true } },
+      },
+    });
+
+    if (!group) {
+      throw new NotFoundException("Group not found");
+    }
+
+    const existingMemberIds = new Set(group.members.map((member) => member.id));
+    const idsToConnect = uniqueIds.filter((studentId) => !existingMemberIds.has(studentId));
+
+    if (idsToConnect.length === 0) {
+      return this.getSerializedGroup(id);
+    }
+
+    if (group.members.length + idsToConnect.length > group.cap) {
+      throw new BadRequestException("Group capacity exceeded");
+    }
+
+    const validStudents = await this.prisma.user.findMany({
+      where: {
+        id: { in: idsToConnect },
+        role: UserRole.STUDENT,
+      },
+      select: { id: true },
+    });
+
+    if (validStudents.length !== idsToConnect.length) {
+      throw new BadRequestException("Invalid student selection");
+    }
+
+    await this.prisma.group.update({
+      where: { id },
+      data: {
+        members: {
+          connect: idsToConnect.map((studentId) => ({ id: studentId })),
+        },
+      },
+    });
+
+    return this.getSerializedGroup(id);
+  }
+
+  async unenrollStudents(id: string, studentIds: string[]): Promise<SerializedGroup> {
+    const uniqueIds = Array.from(new Set(studentIds.filter(Boolean)));
+
+    if (uniqueIds.length === 0) {
+      throw new BadRequestException("Provide at least one student to unenroll");
+    }
+
+    const group = await this.prisma.group.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        members: { select: { id: true } },
+      },
+    });
+
+    if (!group) {
+      throw new NotFoundException("Group not found");
+    }
+
+    const existingMemberIds = new Set(group.members.map((member) => member.id));
+    const idsToDisconnect = uniqueIds.filter((studentId) => existingMemberIds.has(studentId));
+
+    if (idsToDisconnect.length === 0) {
+      return this.getSerializedGroup(id);
+    }
+
+    await this.prisma.group.update({
+      where: { id },
+      data: {
+        members: {
+          disconnect: idsToDisconnect.map((studentId) => ({ id: studentId })),
+        },
+      },
+    });
+
+    return this.getSerializedGroup(id);
+  }
 }
+

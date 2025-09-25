@@ -124,13 +124,17 @@ CREATE TABLE "ChessPreset" (
 CREATE TABLE "_GroupMembers" (
     "A" TEXT NOT NULL,
     "B" TEXT NOT NULL,
-    CONSTRAINT "_GroupMembers_pkey" PRIMARY KEY ("A", "B")
+    CONSTRAINT "_GroupMembers_pkey" PRIMARY KEY ("A", "B"),
+    CONSTRAINT "_GroupMembers_A_fkey" FOREIGN KEY ("A") REFERENCES "Group" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "_GroupMembers_B_fkey" FOREIGN KEY ("B") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE TABLE "_SessionAttendees" (
     "A" TEXT NOT NULL,
     "B" TEXT NOT NULL,
-    CONSTRAINT "_SessionAttendees_pkey" PRIMARY KEY ("A", "B")
+    CONSTRAINT "_SessionAttendees_pkey" PRIMARY KEY ("A", "B"),
+    CONSTRAINT "_SessionAttendees_A_fkey" FOREIGN KEY ("A") REFERENCES "Session" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "_SessionAttendees_B_fkey" FOREIGN KEY ("B") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- Indexes

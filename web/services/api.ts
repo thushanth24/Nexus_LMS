@@ -72,6 +72,28 @@ export interface CreateGroupPayload {
     durationMin?: number;
 }
 
+export interface MaterialPayload {
+    title: string;
+    type: 'pdf' | 'video';
+    url: string;
+}
+
+export type UpdateMaterialPayload = Partial<MaterialPayload>;
+
+export interface HomeworkPayload {
+    title: string;
+    instructions: string;
+    type: 'text' | 'pgn';
+    dueAt: string;
+}
+
+export interface UpdateHomeworkPayload {
+    title?: string;
+    instructions?: string;
+    type?: 'text' | 'pgn';
+    dueAt?: string;
+}
+
 export interface GradeSubmissionPayload {
     grade: number;
     feedback: string;
@@ -117,6 +139,15 @@ export const createGroup = async (payload: CreateGroupPayload): Promise<Group> =
 
 export const getGroupById = async (id: string): Promise<Group> => api<Group>(`/groups/${id}`);
 
+export const updateGroupTeacher = async (id: string, teacherId: string): Promise<Group> =>
+    api<Group>(`/groups/${id}/teacher`, { method: 'PATCH', body: { teacherId } });
+
+export const enrollStudentsToGroup = async (id: string, studentIds: string[]): Promise<Group> =>
+    api<Group>(`/groups/${id}/members/enroll`, { method: 'PATCH', body: { studentIds } });
+
+export const unenrollStudentsFromGroup = async (id: string, studentIds: string[]): Promise<Group> =>
+    api<Group>(`/groups/${id}/members/unenroll`, { method: 'PATCH', body: { studentIds } });
+
 // --- PAIRS ---
 export const getMyTeachingPairs = async (): Promise<OneToOne[]> => api<OneToOne[]>('/pairs/teaching');
 
@@ -128,6 +159,15 @@ export const getPairById = async (id: string): Promise<OneToOne> => api<OneToOne
 export const getMaterialsForClass = async (classId: string): Promise<Material[]> =>
     api<Material[]>(`/materials/class/${classId}`);
 
+export const createMaterialForClass = async (classId: string, payload: MaterialPayload): Promise<Material> =>
+    api<Material>(`/materials/class/${classId}`, { method: 'POST', body: payload });
+
+export const updateMaterial = async (materialId: string, payload: UpdateMaterialPayload): Promise<Material> =>
+    api<Material>(`/materials/${materialId}`, { method: 'PATCH', body: payload });
+
+export const deleteMaterial = async (materialId: string): Promise<void> =>
+    api<void>(`/materials/${materialId}`, { method: 'DELETE' });
+
 // --- SESSIONS / SCHEDULE ---
 export const getMySessions = async (): Promise<Session[]> => api<Session[]>('/schedule/my-sessions');
 
@@ -137,6 +177,15 @@ export const getSessionById = async (sessionId: string): Promise<Session> =>
 // --- HOMEWORK & SUBMISSIONS ---
 export const getHomeworkForClass = async (classId: string): Promise<Homework[]> =>
     api<Homework[]>(`/homework/class/${classId}`);
+
+export const createHomeworkForClass = async (classId: string, payload: HomeworkPayload): Promise<Homework> =>
+    api<Homework>(`/homework/class/${classId}`, { method: 'POST', body: payload });
+
+export const updateHomeworkForClass = async (homeworkId: string, payload: UpdateHomeworkPayload): Promise<Homework> =>
+    api<Homework>(`/homework/${homeworkId}`, { method: 'PATCH', body: payload });
+
+export const deleteHomeworkForClass = async (homeworkId: string): Promise<void> =>
+    api<void>(`/homework/${homeworkId}`, { method: 'DELETE' });
 
 export const getMyHomework = async (): Promise<(Homework & { submissions: Submission[] })[]> =>
     api<(Homework & { submissions: Submission[] })[]>('/homework/me');
