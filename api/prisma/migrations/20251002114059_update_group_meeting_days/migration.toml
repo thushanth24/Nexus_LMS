@@ -1,0 +1,10 @@
+migration_name = "update_group_meeting_days"
+
+# The migration is marked as applied in the database
+applied = true
+
+# The migration was applied at this time
+applied_at = "2025-10-02T06:10:59.000Z"
+
+# The migration was applied by this user
+applied_by = "user"

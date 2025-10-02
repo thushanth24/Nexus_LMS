@@ -181,7 +181,9 @@ const AdminGroupDetail: React.FC = () => {
                 <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <p className="text-sm text-text-secondary">Teacher: {group.teacher?.name || "Unassigned"}</p>
                     <p className="text-sm text-text-secondary">
-                        Meeting Days: {group.meetingDays.length > 0 ? group.meetingDays.join(", ") : "N/A"}
+                        Meeting Days: {group.meetingDays && group.meetingDays.length > 0 
+                            ? group.meetingDays.map(day => `${day.day} (${day.startTime}-${day.endTime})`).join(", ") 
+                            : "N/A"}
                     </p>
                     <p className="text-sm text-text-secondary">Capacity: {group.currentSize}/{group.cap}</p>
                 </div>

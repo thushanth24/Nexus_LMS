@@ -63,12 +63,11 @@ model Group {
   subject      String
   teacher      User      @relation("GroupTeacher", fields: [teacherId], references: [id])
   teacherId    String
-  meetingDays  String[]
+  meetingDays  Json?
   durationMin  Int
   cap          Int
-  levelSpread  String[]
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime  @default(now()) @map("createdAt")
+  updatedAt    DateTime  @updatedAt @map("updatedAt")
 
   // Relations
   members     User[]    @relation("GroupMembers")
@@ -76,6 +75,9 @@ model Group {
   materials   Material[]
   homeworks   Homework[]
   groupMemberLinks GroupMemberLink[]
+
+  @@map("Group")
+  @@index([teacherId], map: "Group_teacherId_idx")
 }
 
 model Pair {

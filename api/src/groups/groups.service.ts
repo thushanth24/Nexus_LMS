@@ -1,7 +1,8 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service.js";
-import { CreateGroupDto } from "./dto/create-group.dto.js";
+import { CreateGroupDto, MeetingDayDto } from "./dto/create-group.dto.js";
 import { UserRole } from "../prisma-enums.js";
+import { Prisma } from '@prisma/client';
 
 export interface SanitizedUser {
   id: string;
@@ -26,15 +27,20 @@ export interface SerializedGroupSession {
   isChessEnabled: boolean;
 }
 
+export interface MeetingDay {
+  day: string;
+  startTime: string;
+  endTime: string;
+}
+
 export interface SerializedGroup {
   id: string;
   title: string;
   subject: string;
   teacherId: string;
-  meetingDays: string[];
+  meetingDays: MeetingDay[];
   durationMin: number;
   cap: number;
-  levelSpread: string[];
   currentSize: number;
   teacher?: SanitizedUser;
   members?: SanitizedUser[];
@@ -121,15 +127,25 @@ export class GroupsService {
         ? group.members.length
         : 0;
 
+    // Parse meetingDays from JSON if it's a string, or use as is if it's already an object
+    let meetingDays: MeetingDay[] = [];
+    try {
+      meetingDays = typeof group.meetingDays === 'string' 
+        ? JSON.parse(group.meetingDays) 
+        : group.meetingDays || [];
+    } catch (e) {
+      console.error('Error parsing meetingDays:', e);
+      meetingDays = [];
+    }
+
     const serialized: SerializedGroup = {
       id: group.id,
       title: group.title,
       subject: group.subject,
       teacherId: group.teacherId,
-      meetingDays: Array.isArray(group.meetingDays) ? group.meetingDays : [],
+      meetingDays: Array.isArray(meetingDays) ? meetingDays : [],
       durationMin: group.durationMin,
       cap: group.cap,
-      levelSpread: Array.isArray(group.levelSpread) ? group.levelSpread : [],
       currentSize: memberCount,
     };
 
@@ -244,24 +260,40 @@ export class GroupsService {
   }
 
   async create(dto: CreateGroupDto): Promise<SerializedGroup> {
-    const group = await this.prisma.group.create({
+    // Calculate duration in minutes if not provided
+    const calculateDuration = (meetingDays: MeetingDayDto[]): number => {
+      if (!meetingDays.length) return 60; // Default to 60 minutes if no meeting days
+      
+      // Calculate average duration across all meeting days
+      let totalMinutes = 0;
+      
+      for (const day of meetingDays) {
+        const [startHours, startMinutes] = day.startTime.split(':').map(Number);
+        const [endHours, endMinutes] = day.endTime.split(':').map(Number);
+        totalMinutes += (endHours * 60 + endMinutes) - (startHours * 60 + startMinutes);
+      }
+      
+      return Math.round(totalMinutes / meetingDays.length);
+    };
+
+    const durationMin = dto.durationMin ?? calculateDuration(dto.meetingDays);
+    
+    // Create the group with the new meetingDays structure
+    const createdGroup = await this.prisma.group.create({
       data: {
         title: dto.title,
         subject: dto.subject,
-        teacher: {
-          connect: { id: dto.teacherId },
-        },
-        meetingDays: dto.meetingDays,
-        durationMin: dto.durationMin ?? 60,
+        teacherId: dto.teacherId,
+        meetingDays: dto.meetingDays as unknown as Prisma.InputJsonValue,
+        durationMin,
         cap: dto.cap,
-        levelSpread: dto.levelSpread,
       },
       include: {
         _count: { select: { members: true } },
       },
     });
 
-    return this.serializeGroup(group);
+    return this.serializeGroup(createdGroup);
   }
 
   async updateTeacher(id: string, teacherId: string): Promise<SerializedGroup> {

@@ -1,0 +1,5 @@
+# This migration fixes the meetingDays data to be properly formatted as JSON
+# It converts string arrays to proper JSON objects with day, startTime, and endTime
+# and ensures all records have a valid JSON value (empty array if previously NULL)
+
+migration_name = "fix_meeting_days_data"

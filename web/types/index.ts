@@ -15,19 +15,34 @@ export interface User {
     avatarUrl?: string | null;
 }
 
+export interface MeetingDay {
+    day: string;
+    startTime: string;
+    endTime: string;
+}
+
+// Define MeetingDayDto interface to match the API
+export interface MeetingDayDto {
+    day: string;
+    startTime: string;
+    endTime: string;
+}
+
 export interface Group {
     id: string;
     title: string;
     subject: string;
     teacherId: string;
-    meetingDays: string[];
+    meetingDays: MeetingDayDto[] | null;
     durationMin: number;
     currentSize: number;
     cap: number;
-    levelSpread: string[];
     teacher?: User;
     members?: User[];
     sessions?: Session[];
+    // For backward compatibility
+    startTime?: string;
+    endTime?: string;
 }
 
 export interface OneToOne {

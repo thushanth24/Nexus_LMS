@@ -1,4 +1,28 @@
-﻿import { ArrayNotEmpty, IsArray, IsInt, IsNotEmpty, IsOptional, IsPositive, IsString, MaxLength } from 'class-validator';
+import { ArrayNotEmpty, IsArray, IsInt, IsNotEmpty, IsOptional, IsPositive, IsString, MaxLength, Matches, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class MeetingDayDto {
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i, {
+    message: 'day must be a valid day of the week (monday, tuesday, etc.)',
+  })
+  day: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, {
+    message: 'startTime must be in HH:MM format (24-hour)',
+  })
+  startTime: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, {
+    message: 'endTime must be in HH:MM format (24-hour)',
+  })
+  endTime: string;
+}
 
 export class CreateGroupDto {
   @IsString()
@@ -17,17 +41,13 @@ export class CreateGroupDto {
 
   @IsArray()
   @ArrayNotEmpty()
-  @IsString({ each: true })
-  meetingDays: string[];
+  @ValidateNested({ each: true })
+  @Type(() => MeetingDayDto)
+  meetingDays: MeetingDayDto[];
 
   @IsInt()
   @IsPositive()
   cap: number;
-
-  @IsArray()
-  @ArrayNotEmpty()
-  @IsString({ each: true })
-  levelSpread: string[];
 
   @IsOptional()
   @IsInt()

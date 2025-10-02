@@ -1,0 +1,4 @@
+# This migration removes the old startTime and endTime columns
+# since we're now using meetingDays JSONB for this information
+
+migration_name = "drop_start_end_time_columns"

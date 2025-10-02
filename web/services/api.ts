@@ -62,13 +62,18 @@ export interface CreateStudentPayload {
     avatarUrl?: string | null;
 }
 
+export interface MeetingDayDto {
+    day: string;
+    startTime: string;
+    endTime: string;
+}
+
 export interface CreateGroupPayload {
     title: string;
     subject: string;
     teacherId: string;
-    meetingDays: string[];
+    meetingDays: MeetingDayDto[];
     cap: number;
-    levelSpread: string[];
     durationMin?: number;
 }
 
